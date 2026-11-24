@@ -1,8 +1,8 @@
 # Deployment
 
-**Live application:** https://REPLACE-WITH-RENDER-URL.onrender.com
+**Live application:** https://malware-agent-d1cx.onrender.com
 
-**Health check:** https://REPLACE-WITH-RENDER-URL.onrender.com/health
+**Health check:** https://malware-agent-d1cx.onrender.com/health
 
 **Expected startup delay:** the app runs on Render's free tier, which puts the service to sleep after about 15 minutes without traffic. The first request after that can take **30–60 seconds** while the instance wakes and loads the model. Later requests are fast. Each agent reply typically takes 5–20 seconds, depending on how many tools it calls.
 

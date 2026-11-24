@@ -1,0 +1,74 @@
+name: CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Unit, integration and agent tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Run tests (mocked AI model, no API key)
+        run: python -m pytest -v --junitxml=test-results.xml tests
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: test-results.xml
+
+  deploy:
+    name: Deploy to Render (only after tests pass)
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger Render deploy of this exact commit
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          test -n "$HOOK" || { echo "RENDER_DEPLOY_HOOK_URL secret is not set"; exit 1; }
+          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${HOOK}&ref=${GITHUB_SHA}")
+          echo "Render deploy hook responded HTTP $code"
+          test "$code" = "200"
+
+  smoke-test:
+    name: Post-deployment smoke test (/health)
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for the new commit to be live and healthy
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          test -n "$APP_URL" || { echo "APP_URL repository variable is not set"; exit 1; }
+          deadline=$(( $(date +%s) + 1200 ))   # free-tier builds can take several minutes
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            body=$(curl -s --max-time 60 "$APP_URL/health" || true)
+            commit=$(echo "$body" | python3 -c "import sys,json; print(json.load(sys.stdin).get('commit',''))" 2>/dev/null || true)
+            status=$(echo "$body" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || true)
+            echo "$(date -u +%H:%M:%S) status=$status commit=$commit"
+            if [ "$status" = "ok" ] && [ "$commit" = "$GITHUB_SHA" ]; then
+              echo "### Smoke test passed" >> "$GITHUB_STEP_SUMMARY"
+              echo "\`GET $APP_URL/health\` returned status ok for commit \`$GITHUB_SHA\`." >> "$GITHUB_STEP_SUMMARY"
+              echo '```json' >> "$GITHUB_STEP_SUMMARY"; echo "$body" >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "### Smoke test FAILED: /health did not report commit $GITHUB_SHA within 20 minutes" >> "$GITHUB_STEP_SUMMARY"
+          exit 1

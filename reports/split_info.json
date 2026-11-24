@@ -1,0 +1,27 @@
+{
+  "method": "StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42), first fold = test; groups=SHA1",
+  "raw_train_rows": 40144,
+  "raw_test_rows": 10037,
+  "raw_test_fraction": 0.2,
+  "train_dedup": {
+    "rows_in": 40144,
+    "conflicting_label_files": 13,
+    "rows_dropped_conflicting": 38,
+    "rows_out": 34716
+  },
+  "test_dedup": {
+    "rows_in": 10037,
+    "conflicting_label_files": 5,
+    "rows_dropped_conflicting": 16,
+    "rows_out": 8677
+  },
+  "train_class_counts": {
+    "0": 16879,
+    "1": 17837
+  },
+  "test_class_counts": {
+    "0": 4219,
+    "1": 4458
+  },
+  "csv_sha256_observed": "d13e54cf1970ffedbf1043196c135da3187c90a82e397f681d843ed320249242"
+}

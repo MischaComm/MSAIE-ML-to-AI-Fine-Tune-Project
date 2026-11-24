@@ -1,0 +1,51 @@
+[14:51:37] loading data and creating hold-out split
+[14:51:47] {"method": "StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42), first fold = test; groups=SHA1", "raw_train_rows": 40144, "raw_test_rows": 10037, "raw_test_fraction": 0.2, "train_dedup": {"rows_in": 40144, "conflicting_label_files": 13, "rows_dropped_conflicting": 38, "rows_out": 34716}, "test_dedup": {"rows_in": 10037, "conflicting_label_files": 5, "rows_dropped_conflicting": 16, "rows_out": 8677}, "train_class_counts": {"0": 16879, "1": 17837}, "test_class_counts": {"0": 4219, "1": 4458}}
+[14:51:47] ablation: numeric_only
+[14:51:49]   logistic_regression: AUC 0.9455±0.0034 acc 0.8837
+[14:51:58]   lightgbm: AUC 0.9977±0.0006 acc 0.9849
+[14:51:58] ablation: numeric+identify+dlls
+[14:52:06]   logistic_regression: AUC 0.9863±0.0018 acc 0.9538
+[14:52:25]   lightgbm: AUC 0.9984±0.0005 acc 0.9871
+[14:52:25] ablation: all_text_small_vocab
+[14:53:25]   logistic_regression: AUC 0.9939±0.0015 acc 0.9725
+[14:55:37]   lightgbm: AUC 0.9986±0.0004 acc 0.9876
+[14:55:37] ablation: all_text_large_vocab
+[14:56:53]   logistic_regression: AUC 0.9948±0.0010 acc 0.9749
+[15:01:29]   lightgbm: AUC 0.9986±0.0004 acc 0.9874
+[15:01:29] building fold matrices with {'n_ident': 50, 'n_dll': 300, 'n_sym': 1000}
+[15:02:07] tune logistic_regression {'C': 0.1}: AUC 0.9946 acc 0.9730 (1.2s/fit)
+[15:02:16] tune logistic_regression {'C': 1.0}: AUC 0.9945 acc 0.9739 (3.1s/fit)
+[15:02:43] tune logistic_regression {'C': 10.0}: AUC 0.9927 acc 0.9721 (8.9s/fit)
+[15:02:56] CV logistic_regression: AUC 0.9942±0.0013  acc 0.9712±0.0029
+[15:03:00] tune decision_tree {'max_depth': 10, 'min_samples_leaf': 1}: AUC 0.9862 acc 0.9761 (1.4s/fit)
+[15:03:05] tune decision_tree {'max_depth': 10, 'min_samples_leaf': 5}: AUC 0.9909 acc 0.9762 (1.5s/fit)
+[15:03:14] tune decision_tree {'max_depth': 20, 'min_samples_leaf': 1}: AUC 0.9763 acc 0.9793 (3.1s/fit)
+[15:03:23] tune decision_tree {'max_depth': 20, 'min_samples_leaf': 5}: AUC 0.9881 acc 0.9775 (2.8s/fit)
+[15:03:34] tune decision_tree {'max_depth': None, 'min_samples_leaf': 1}: AUC 0.9795 acc 0.9796 (3.8s/fit)
+[15:03:44] tune decision_tree {'max_depth': None, 'min_samples_leaf': 5}: AUC 0.9881 acc 0.9779 (3.3s/fit)
+[15:03:58] CV decision_tree: AUC 0.9891±0.0016  acc 0.9744±0.0027
+[15:06:24] tune random_forest {'n_estimators': 200, 'max_features': 'sqrt', 'min_samples_leaf': 1}: AUC 0.9981 acc 0.9864 (48.2s/fit)
+[15:08:08] tune random_forest {'n_estimators': 200, 'max_features': 'sqrt', 'min_samples_leaf': 2}: AUC 0.9980 acc 0.9848 (34.6s/fit)
+[15:11:02] tune random_forest {'n_estimators': 200, 'max_features': 0.05, 'min_samples_leaf': 1}: AUC 0.9984 acc 0.9868 (58.1s/fit)
+[15:13:29] tune random_forest {'n_estimators': 200, 'max_features': 0.05, 'min_samples_leaf': 2}: AUC 0.9981 acc 0.9857 (48.8s/fit)
+[15:23:03] CV random_forest: AUC 0.9983±0.0004  acc 0.9858±0.0012
+[15:23:27] tune pytorch_mlp {'hidden_sizes': (256, 64), 'dropout': 0.2, 'epochs': 15}: AUC 0.9960 acc 0.9790 (8.0s/fit)
+[15:24:10] tune pytorch_mlp {'hidden_sizes': (512, 128), 'dropout': 0.3, 'epochs': 15}: AUC 0.9959 acc 0.9792 (14.4s/fit)
+[15:24:58] tune pytorch_mlp {'hidden_sizes': (256, 64), 'dropout': 0.2, 'epochs': 30, 'weight_decay': 0.0001}: AUC 0.9960 acc 0.9814 (16.1s/fit)
+[15:26:14] CV pytorch_mlp: AUC 0.9961±0.0012  acc 0.9787±0.0022
+[15:26:21] tune xgboost {'n_estimators': 400, 'max_depth': 6, 'learning_rate': 0.05, 'subsample': 0.8, 'colsample_bytree': 0.5}: AUC 0.9986 acc 0.9873 (2.5s/fit)
+[15:26:29] tune xgboost {'n_estimators': 400, 'max_depth': 6, 'learning_rate': 0.1, 'subsample': 0.8, 'colsample_bytree': 0.5}: AUC 0.9986 acc 0.9886 (2.4s/fit)
+[15:26:41] tune xgboost {'n_estimators': 400, 'max_depth': 10, 'learning_rate': 0.05, 'subsample': 0.8, 'colsample_bytree': 0.5}: AUC 0.9987 acc 0.9889 (4.0s/fit)
+[15:26:52] tune xgboost {'n_estimators': 400, 'max_depth': 10, 'learning_rate': 0.1, 'subsample': 0.8, 'colsample_bytree': 0.5}: AUC 0.9986 acc 0.9895 (3.7s/fit)
+[15:27:31] CV xgboost: AUC 0.9987±0.0004  acc 0.9878±0.0017
+[15:28:12] tune lightgbm {'n_estimators': 400, 'num_leaves': 31, 'learning_rate': 0.05, 'subsample': 0.8, 'subsample_freq': 1, 'colsample_bytree': 0.5}: AUC 0.9986 acc 0.9884 (13.4s/fit)
+[15:28:53] tune lightgbm {'n_estimators': 400, 'num_leaves': 31, 'learning_rate': 0.1, 'subsample': 0.8, 'subsample_freq': 1, 'colsample_bytree': 0.5}: AUC 0.9986 acc 0.9891 (13.8s/fit)
+[15:29:40] tune lightgbm {'n_estimators': 400, 'num_leaves': 127, 'learning_rate': 0.05, 'subsample': 0.8, 'subsample_freq': 1, 'colsample_bytree': 0.5}: AUC 0.9988 acc 0.9892 (15.7s/fit)
+[15:30:28] tune lightgbm {'n_estimators': 400, 'num_leaves': 127, 'learning_rate': 0.1, 'subsample': 0.8, 'subsample_freq': 1, 'colsample_bytree': 0.5}: AUC 0.9987 acc 0.9883 (15.6s/fit)
+[15:33:06] CV lightgbm: AUC 0.9988±0.0004  acc 0.9883±0.0017
+[15:34:02] tune catboost {'iterations': 500, 'depth': 6, 'learning_rate': 0.1}: AUC 0.9982 acc 0.9870 (18.8s/fit)
+[15:37:06] tune catboost {'iterations': 500, 'depth': 8, 'learning_rate': 0.1}: AUC 0.9985 acc 0.9883 (61.4s/fit)
+[15:47:32] CV catboost: AUC 0.9984±0.0004  acc 0.9870±0.0019
+[15:47:32] selected production model: lightgbm (close contenders: ['lightgbm', 'xgboost', 'catboost', 'random_forest'])
+[15:47:53] refit on full training set (34716 rows) in 20.6s
+[15:47:53] saved artifacts/model.joblib and artifacts/metadata.json — now run: python eval.py

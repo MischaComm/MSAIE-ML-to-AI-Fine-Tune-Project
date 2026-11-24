@@ -1,0 +1,25 @@
+# Render Blueprint. Deploys are triggered ONLY by the GitHub Actions workflow
+# (deploy hook, after tests pass). Automatic deploys on push are turned off.
+services:
+  - type: web
+    name: malware-agent
+    runtime: python
+    plan: free
+    branch: main
+    autoDeployTrigger: "off"
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:app --workers 1 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.18
+      - key: ANTHROPIC_API_KEY
+        sync: false          # set in the Render dashboard; never committed
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-5-5
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: ENABLE_FAULT_INJECTION
+        value: "true"        # shows the "simulate tool failure" checkbox used in agent evaluation

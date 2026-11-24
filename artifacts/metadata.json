@@ -1,0 +1,146 @@
+{
+  "model_version": "1.0.0",
+  "model_name": "lightgbm",
+  "hyperparameters": {
+    "n_estimators": 400,
+    "num_leaves": 127,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "subsample_freq": 1,
+    "colsample_bytree": 0.5
+  },
+  "preprocessing": {
+    "n_ident": 50,
+    "n_dll": 300,
+    "n_sym": 1000
+  },
+  "classification_threshold": 0.5,
+  "threshold_note": "predict malware when P(malware) >= threshold; scores are not calibrated probabilities",
+  "label_mapping": {
+    "0": "goodware",
+    "1": "malware"
+  },
+  "positive_class": 1,
+  "feature_schema": {
+    "model_features": [
+      "BaseOfCode",
+      "BaseOfData",
+      "Characteristics",
+      "DllCharacteristics",
+      "Entropy",
+      "FileAlignment",
+      "ImageBase",
+      "Machine",
+      "Magic",
+      "NumberOfRvaAndSizes",
+      "NumberOfSections",
+      "NumberOfSymbols",
+      "PE_TYPE",
+      "PointerToSymbolTable",
+      "Size",
+      "SizeOfCode",
+      "SizeOfHeaders",
+      "SizeOfImage",
+      "SizeOfInitializedData",
+      "SizeOfOptionalHeader",
+      "SizeOfUninitializedData",
+      "TimeDateStamp",
+      "Identify",
+      "ImportedDlls",
+      "ImportedSymbols"
+    ],
+    "types": {
+      "BaseOfCode": "number",
+      "BaseOfData": "number",
+      "Characteristics": "number",
+      "DllCharacteristics": "number",
+      "Entropy": "number",
+      "FileAlignment": "number",
+      "ImageBase": "number",
+      "Machine": "number",
+      "Magic": "number",
+      "NumberOfRvaAndSizes": "number",
+      "NumberOfSections": "number",
+      "NumberOfSymbols": "number",
+      "PE_TYPE": "number",
+      "PointerToSymbolTable": "number",
+      "Size": "number",
+      "SizeOfCode": "number",
+      "SizeOfHeaders": "number",
+      "SizeOfImage": "number",
+      "SizeOfInitializedData": "number",
+      "SizeOfOptionalHeader": "number",
+      "SizeOfUninitializedData": "number",
+      "TimeDateStamp": "number",
+      "Identify": "string",
+      "ImportedDlls": "string",
+      "ImportedSymbols": "string"
+    },
+    "nullable": [
+      "Identify"
+    ],
+    "ignored_if_present": [
+      "SHA1",
+      "FirstSeenDate",
+      "Label"
+    ]
+  },
+  "dataset": {
+    "name": "brazilian-malware-dataset",
+    "source": "https://github.com/fabriciojoc/brazilian-malware-dataset",
+    "commit": "9f0d8a65a42a87eb0944a67fecc03934bace2d20",
+    "file": "brazilian-malware.zip -> brazilian-malware.csv",
+    "zip_sha256": "657136309532868b78b646b14716013d5c36681f5d4bd008536523c1912ea7b7",
+    "csv_sha256": "d13e54cf1970ffedbf1043196c135da3187c90a82e397f681d843ed320249242",
+    "raw_rows": 50181,
+    "raw_columns": 28
+  },
+  "split": {
+    "method": "StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42), first fold = test; groups=SHA1",
+    "raw_train_rows": 40144,
+    "raw_test_rows": 10037,
+    "raw_test_fraction": 0.2,
+    "train_dedup": {
+      "rows_in": 40144,
+      "conflicting_label_files": 13,
+      "rows_dropped_conflicting": 38,
+      "rows_out": 34716
+    },
+    "test_dedup": {
+      "rows_in": 10037,
+      "conflicting_label_files": 5,
+      "rows_dropped_conflicting": 16,
+      "rows_out": 8677
+    },
+    "train_class_counts": {
+      "0": 16879,
+      "1": 17837
+    },
+    "test_class_counts": {
+      "0": 4219,
+      "1": 4458
+    },
+    "csv_sha256_observed": "d13e54cf1970ffedbf1043196c135da3187c90a82e397f681d843ed320249242"
+  },
+  "cv": {
+    "folds": 10,
+    "auc_mean": 0.9987731270885734,
+    "auc_std": 0.00039821417919964723,
+    "acc_mean": 0.9882761727519791,
+    "acc_std": 0.0016644708068410618
+  },
+  "selection_rule": "max mean 10-fold CV AUC; models within 0.001 AUC ranked by accuracy then inference speed",
+  "seed": 42,
+  "trained_at": "2026-11-23T19:51:37.307177+00:00",
+  "quick_run": false,
+  "environment": {
+    "python": "3.13.18",
+    "sklearn": "1.9.1",
+    "xgboost": "3.4.1",
+    "lightgbm": "4.7.0",
+    "catboost": "1.2.10",
+    "torch": "2.15.0+cpu",
+    "pandas": "3.1.1",
+    "numpy": "2.5.5"
+  }
+}

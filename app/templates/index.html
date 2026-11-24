@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Malware Analysis & Evaluation Agent</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f5f2; --panel: #ffffff; --ink: #1d232a; --muted: #5d6670; --line: #dedfd9;
+    --accent: #1f5f8b; --accent-soft: #e6eff5; --bad: #a83232; --bad-soft: #f8e9e9; --ok: #2e7044; --ok-soft: #e7f2ea;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--bg); }
+  header { padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--panel); display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; }
+  header .meta { color: var(--muted); font-size: 13px; }
+  main { display: grid; grid-template-columns: 320px 1fr; gap: 20px; padding: 20px 24px; max-width: 1400px; margin: 0 auto; height: calc(100vh - 56px); }
+  aside { display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 10px; }
+  .card p.hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+  button { font: inherit; cursor: pointer; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); padding: 7px 10px; color: var(--ink); text-align: left; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); text-align: center; }
+  button:disabled { opacity: .5; cursor: default; }
+  .actions { display: flex; flex-direction: column; gap: 6px; }
+  .actions button { font-size: 13.5px; }
+  .files { list-style: none; padding: 0; margin: 8px 0 0; font-size: 13px; }
+  .files li { padding: 6px 0; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; }
+  .files code { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+  .tag { font-size: 11px; padding: 1px 6px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+  .chat { display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; min-height: 0; }
+  #log { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { max-width: 860px; }
+  .msg.user { align-self: flex-end; background: var(--accent-soft); padding: 9px 13px; border-radius: 10px; white-space: pre-wrap; }
+  .msg.agent .body { line-height: 1.55; }
+  .msg.agent .body table { border-collapse: collapse; margin: 8px 0; font-size: 14px; }
+  .msg.agent .body th, .msg.agent .body td { border: 1px solid var(--line); padding: 4px 10px; text-align: left; }
+  .msg.agent .body code { font-family: var(--mono); font-size: 13px; background: #f1f1ee; padding: 1px 4px; border-radius: 3px; }
+  .msg.error { background: var(--bad-soft); color: var(--bad); padding: 9px 13px; border-radius: 8px; }
+  details.activity { margin-top: 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
+  details.activity summary { padding: 6px 10px; cursor: pointer; color: var(--muted); }
+  .call { border-top: 1px solid var(--line); padding: 8px 10px; }
+  .call .name { font-family: var(--mono); font-weight: 600; }
+  .status-ok { color: var(--ok); } .status-error { color: var(--bad); }
+  .call pre { font-family: var(--mono); font-size: 12px; background: #f7f7f4; padding: 6px 8px; border-radius: 4px; overflow-x: auto; margin: 4px 0 0; white-space: pre-wrap; word-break: break-word; }
+  .links a { display: inline-block; margin-top: 8px; color: var(--accent); font-weight: 600; }
+  form#composer { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+  #input { flex: 1; font: inherit; padding: 9px 11px; border: 1px solid var(--line); border-radius: 6px; resize: vertical; min-height: 44px; max-height: 200px; }
+  .thinking { color: var(--muted); font-style: italic; }
+  .fault { font-size: 13px; color: var(--bad); display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+  .disclaimer { font-size: 12px; color: var(--muted); }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; height: auto; } .chat { height: 75vh; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Malware Analysis &amp; Evaluation Agent</h1>
+  <span class="meta">Production model: {{ model.model_name }} v{{ model.model_version }} · threshold {{ model.threshold }} · labels 0 = goodware, 1 = malware</span>
+</header>
+<main>
+  <aside>
+    <div class="card">
+      <h2>Upload data</h2>
+      <input type="file" id="file" accept=".csv,.json">
+      <p class="hint">CSV with the 25 model features (optionally SHA1 and Label), or a single record as JSON. Max {{ max_mb|int }} MB.</p>
+      <ul class="files" id="files"></ul>
+    </div>
+    <div class="card">
+      <h2>Try a task</h2>
+      <div class="actions">
+        <button data-prompt="Classify the pre-filled example malware record.">1 · Classify one record (pre-filled example)</button>
+        <button data-sample="unlabeled_batch.csv" data-prompt="Classify every row in unlabeled_batch.csv and summarise the results.">2 · Classify a batch (sample CSV)</button>
+        <button data-sample="labeled_demo_mixed.csv" data-prompt="Evaluate labeled_demo_mixed.csv. If accuracy is at least 90%, classify the pre-filled example goodware record; otherwise don't.">3a · Evaluate + conditional predict (threshold met)</button>
+        <button data-sample="labeled_demo_mixed.csv" data-prompt="Evaluate labeled_demo_mixed.csv. If accuracy is at least 98%, classify the pre-filled example goodware record; otherwise don't.">3b · Evaluate + conditional predict (threshold not met)</button>
+        <button data-prompt="How many false negatives were there in the last evaluation, and which rows?">Follow-up · false negatives</button>
+        <button data-sample="batch_with_invalid_rows.csv" data-prompt="Classify batch_with_invalid_rows.csv.">Error case · batch with invalid rows</button>
+      </div>
+      <p class="hint">Buttons that use a sample file upload it to your session first.</p>
+      {% if fault_injection %}
+      <label class="fault"><input type="checkbox" id="fault"> Simulate a tool failure on the next request</label>
+      {% endif %}
+    </div>
+    <div class="card">
+      <h2>Session</h2>
+      <button id="reset">Start a new session</button>
+      <p class="hint">Your uploads and results are private to this browser session and expire after 2 hours.</p>
+      <p class="disclaimer">Predictions are model assessments of static file features. They do not establish that software is safe to run.</p>
+    </div>
+  </aside>
+
+  <section class="chat">
+    <div id="log">
+      <div class="msg agent"><div class="body">
+        Hi. I classify Windows PE-file feature records as <b>malware</b> or <b>goodware</b> using the trained production model, and evaluate it on labeled data. Upload a CSV or JSON record, or pick a task on the left. Every result comes from the model's tools, and each reply lists the tools I called.
+      </div></div>
+    </div>
+    <form id="composer">
+      <textarea id="input" placeholder="Ask the agent… e.g. “Classify row_3 of my upload” or “Evaluate my labeled file”" rows="1"></textarea>
+      <button class="primary" id="send" type="submit">Send</button>
+    </form>
+  </section>
+</main>
+
+<script>
+const log = document.getElementById("log");
+const input = document.getElementById("input");
+const send = document.getElementById("send");
+
+function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+function md(s) { return DOMPurify.sanitize(marked.parse(s || "")); }
+function scroll() { log.scrollTop = log.scrollHeight; }
+function shortJSON(o) {
+  let s = JSON.stringify(o, null, 2);
+  return s.length > 1500 ? s.slice(0, 1500) + "\n… (truncated for display)" : s;
+}
+
+function addUser(text) {
+  const d = document.createElement("div"); d.className = "msg user"; d.textContent = text; log.appendChild(d); scroll();
+}
+function addError(text) {
+  const d = document.createElement("div"); d.className = "msg error"; d.textContent = text; log.appendChild(d); scroll();
+}
+function addAgent(data) {
+  const d = document.createElement("div"); d.className = "msg agent";
+  let html = (data.warnings || []).map(w => `<div class="msg error">⚠ ${esc(w)}</div>`).join("");
+  html += `<div class="body">${md(data.reply)}</div>`;
+  if (data.links && data.links.length) {
+    html += `<div class="links">` + data.links.map(l => `<a href="${esc(l.url)}">${esc(l.label)}</a>`).join("<br>") + `</div>`;
+  }
+  const acts = data.activity || [];
+  html += `<details class="activity"${acts.length ? " open" : ""}><summary>Activity record · ${acts.length} tool call${acts.length === 1 ? "" : "s"} · ${esc(data.model || "")} · ${data.elapsed_seconds}s</summary>`;
+  acts.forEach((a, i) => {
+    html += `<div class="call"><span class="name">${i + 1}. ${esc(a.tool)}</span> <span class="status-${a.status}">${esc(a.status)}</span>
+      <pre>arguments: ${esc(shortJSON(a.arguments))}</pre>
+      <pre>${a.status === "ok" ? "result: " + esc(shortJSON(a.result)) : "error: " + esc(a.error)}</pre></div>`;
+  });
+  if (!acts.length) html += `<div class="call">No tools were called for this reply.</div>`;
+  html += `</details>`;
+  d.innerHTML = html; log.appendChild(d); scroll();
+}
+
+async function refreshFiles() {
+  const r = await fetch("/api/files"); const files = await r.json();
+  document.getElementById("files").innerHTML = files.map(f =>
+    `<li><span>${esc(f.name)}<br><code>${esc(f.file_id)}</code></span><span class="tag">${f.rows} row${f.rows === 1 ? "" : "s"}${f.has_label ? " · labeled" : ""}</span></li>`).join("");
+  return files;
+}
+
+async function uploadBlob(blob, name) {
+  const fd = new FormData(); fd.append("file", blob, name);
+  const r = await fetch("/api/upload", { method: "POST", body: fd });
+  const j = await r.json();
+  if (j.status !== "ok") { addError(`Upload failed: ${j.error}`); return null; }
+  await refreshFiles();
+  return j;
+}
+
+document.getElementById("file").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const j = await uploadBlob(f, f.name);
+  if (j) {
+    const d = document.createElement("div"); d.className = "msg agent";
+    d.innerHTML = `<div class="body thinking">Uploaded ${esc(j.name)} as <code>${esc(j.file_id)}</code> (${j.rows} row${j.rows === 1 ? "" : "s"}${j.has_label ? ", has Label column" : ""}). Tell me what to do with it.</div>`;
+    log.appendChild(d); scroll();
+  }
+  e.target.value = "";
+});
+
+async function ask(text) {
+  addUser(text);
+  send.disabled = true;
+  const t = document.createElement("div"); t.className = "msg agent thinking"; t.textContent = "Working…"; log.appendChild(t); scroll();
+  const fault = document.getElementById("fault");
+  try {
+    const r = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, simulate_tool_failure: !!(fault && fault.checked) }) });
+    const j = await r.json();
+    t.remove();
+    if (j.status === "ok") addAgent(j); else addError(j.error || "Request failed");
+  } catch (e) { t.remove(); addError("Network error: the server did not respond. Free-tier hosting may be waking up; try again in a minute."); }
+  if (fault) fault.checked = false;
+  send.disabled = false;
+}
+
+document.getElementById("composer").addEventListener("submit", e => {
+  e.preventDefault(); const text = input.value.trim(); if (!text) return; input.value = ""; ask(text);
+});
+input.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); document.getElementById("composer").requestSubmit(); } });
+
+document.querySelectorAll("[data-prompt]").forEach(b => b.addEventListener("click", async () => {
+  const sample = b.dataset.sample;
+  if (sample) {
+    const files = await refreshFiles();
+    if (!files.some(f => f.name === sample)) {
+      const r = await fetch(`/samples/${sample}`);
+      if (!(await uploadBlob(await r.blob(), sample))) return;
+    }
+  }
+  ask(b.dataset.prompt);
+}));
+
+document.getElementById("reset").addEventListener("click", async () => {
+  await fetch("/api/reset", { method: "POST" }); location.reload();
+});
+
+refreshFiles();
+</script>
+</body>
+</html>

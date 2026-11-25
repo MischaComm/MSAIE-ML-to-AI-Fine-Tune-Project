@@ -1,52 +1,37 @@
 # Agent Evaluation with the Actual AI Model
 
-> **Status: to be completed after deployment.** Run
-> `python scripts/run_agent_eval.py --url https://<live-app>.onrender.com`,
-> review each reply in `reports/agent_eval_results.json`, then fill in the tables below.
-> The scenario design, expected behaviour and checks are final.
-
-These scenarios use the **deployed** app and the **real** configured AI model. They are separate from the mocked agent tests in CI (`tests/test_agent.py`).
+These scenarios ran against the **deployed** app using the **real** configured AI model. They are separate from the mocked agent tests in CI (`tests/test_agent.py`), which use a scripted stand-in for determinism.
 
 | Item | Value |
 |---|---|
-| AI model | `claude-sonnet-5-5` (from `/health` → `llm_model`) |
+| AI model | `claude-sonnet-5-5` (Anthropic), as reported by `/health` |
 | ML model | LightGBM v1.0.0, threshold 0.5 |
-| App URL / commit | _fill in_ |
-| Evaluation date | _fill in_ |
-| Method | `scripts/run_agent_eval.py`: each scenario starts a fresh browser session (except the follow-up, which reuses scenario 3b's session), uploads sample files through `/api/upload`, sends the request to `/api/chat`, and records the activity record and reply. Numerical statements in replies are checked automatically against the tool outputs, then reviewed by hand. |
-
-## Scenarios
-
-| # | Scenario | Request | Expected behaviour |
-|---|---|---|---|
-| 1 | Single prediction | "Classify the pre-filled example malware record." | `predict_single_record(example="example_malware")`; reports the model's class, score (described as uncalibrated) and version |
-| 2 | Batch prediction | upload `unlabeled_batch.csv`; "Classify every row … give me the malware and goodware counts." | `predict_batch(file_id)`; counts match the tool summary; link to per-row results |
-| 3a | Evaluation → prediction **permitted** | upload `labeled_demo_mixed.csv`; "Evaluate … If the accuracy is at least 90%, classify the pre-filled example goodware record …" | `evaluate_labeled_data(min_accuracy=0.9)` → accuracy 0.94 ≥ 0.90 → `predict_single_record` called and reported |
-| 3b | Evaluation → prediction **withheld** | same file; threshold 98% | `evaluate_labeled_data(min_accuracy=0.98)` → 0.94 < 0.98 → **no** `predict_single_record`; agent explains why |
-| 4 | False-negative follow-up | (same session as 3b) "How many false negatives were there … which rows?" | answer = 4 (confusion-matrix FN), from the stored result, optionally via `query_results(false_negatives)`; FN defined as true malware predicted goodware |
-| 5 | Invalid input | upload `batch_with_invalid_rows.csv`; "Classify …" | `predict_batch`; 8 rows scored; row_4 (non-numeric Entropy) and row_7 (missing NumberOfSections) reported as invalid, not dropped |
-| 6 | Missing labels | upload `unlabeled_batch.csv`; "Evaluate the model's accuracy on it." | no metrics; explains that there is no Label column and asks for a labeled CSV |
-| 7 | Single-class evaluation | upload `labeled_single_class_malware.csv`; "Evaluate …" | `evaluate_labeled_data`; AUC reported as undefined (one true class), accuracy and confusion matrix still reported |
-| 8 | Tool / service failure | "Classify the pre-filled example malware record." with the *simulate tool failure* control (server flag `ENABLE_FAULT_INJECTION`) | tool returns an error; agent says the step failed and reports no prediction; UI shows a warning banner |
+| App | https://malware-agent-d1cx.onrender.com, commit `73bf048` |
+| Evaluation date | 2026-11-24 (20:15 UTC) |
+| Method | `scripts/run_agent_eval.py` starts a fresh browser session for each scenario. The exception is the follow-up, which reuses scenario 3b's session. The script uploads sample files through `/api/upload`, sends the request to `/api/chat`, and records the tools called, their arguments, the results and the reply. Numerical statements in replies are checked automatically against the tool outputs. I then reviewed every reply by hand, and checked the row IDs and scores that were not shown in the activity record (scenarios 4 and 5) by re-running the production model locally. |
+| Raw evidence | [`reports/agent_eval_results.json`](reports/agent_eval_results.json) (full requests, arguments, tool results and replies) and [`reports/agent_eval_table.md`](reports/agent_eval_table.md) |
 
 ## Results
 
-_Paste `reports/agent_eval_table.md` here and add your manual review notes._
+**Scenario pass rate: 9 / 9.** The 8 required scenarios all passed. The conditional scenario was run in both its permitted and its withheld form.
 
-| # | Tools actually called (arguments) | Observed result | Numerical check | Pass/Fail |
-|---|---|---|---|---|
-| 1 | | | | |
-| 2 | | | | |
-| 3a | | | | |
-| 3b | | | | |
-| 4 | | | | |
-| 5 | | | | |
-| 6 | | | | |
-| 7 | | | | |
-| 8 | | | | |
-
-**Scenario pass rate:** _x / 9_ (8 required scenarios; the conditional scenario is run in both its permitted and withheld forms).
+| # | Scenario and request | Tools actually called (arguments) | Observed result | Numerical check | Result |
+|---|---|---|---|---|---|
+| 1 | **Single prediction.** "Classify the pre-filled example malware record." | `predict_single_record(example="example_malware")` → ok | Reported **malware**, score 0.999994, threshold 0.5, lightgbm v1.0.0. It said the score "is not a probability or a confidence level" and that the output does not show which features drove the result. | Class, score, threshold and version match the tool output. | **Pass** |
+| 2 | **Batch prediction.** Uploaded `unlabeled_batch.csv`; "Classify every row … give me the malware and goodware counts." | `predict_batch(file_id="file_4e442f75")` → ok | 50 rows scored, 0 invalid: **28 malware, 22 goodware**. It gave the result ID and a download link, and noted that accuracy can't be assessed without labels. | 28 / 22 / 0 match `summary`; 28 + 22 = 50 = `n_predicted`. | **Pass** |
+| 3a | **Evaluation → prediction permitted.** Uploaded `labeled_demo_mixed.csv`; "… If the accuracy is at least 90%, classify the pre-filled example goodware record …" | 1. `evaluate_labeled_data(file_id="file_7bf146cb", min_accuracy=0.9)` → ok, `meets_min_accuracy: true`<br>2. `predict_single_record(example="example_goodware")` → ok | Reported AUC 0.983897, accuracy 0.94 (94%), criterion met, and the confusion matrix (TN 52, FP 2, FN 4, TP 42), with layout and positive class labeled. It then reported **goodware**, score 8e-06. | All metrics match the tool output; TN + FP + FN + TP = 100; (52 + 42) / 100 = 0.94. | **Pass** |
+| 3b | **Evaluation → prediction withheld.** Same file; threshold 98%. | `evaluate_labeled_data(file_id="file_19b9643b", min_accuracy=0.98)` → ok, `meets_min_accuracy: false` | Same metrics reported. It stated "Accuracy was 94%, below the required 98%" and that it **did not** classify the record. `predict_single_record` was **not called**. | 0.94 < 0.98 is consistent with the tool's `meets_min_accuracy: false`. | **Pass** |
+| 4 | **False-negative follow-up** (same session as 3b). "How many false negatives were there in that evaluation, and which rows were they?" | `query_results(result_id="eval_48578d56", query="false_negatives")` → ok | **4 false negatives**, correctly defined as true malware predicted as goodware: row_5 (0.000009), row_14 (0.000291), row_58 (0.181432), row_90 (0.000139). It referenced the stored result rather than re-evaluating. | Count 4 = confusion-matrix FN. Row IDs and scores verified against the production model: exact match. | **Pass** |
+| 5 | **Invalid input.** Uploaded `batch_with_invalid_rows.csv`; "Classify batch_with_invalid_rows.csv." | `predict_batch(file_id="file_2bd94e8f")` → ok | 8 of 10 scored (5 malware, 3 goodware). **row_4** was reported invalid ("Entropy must be a number … 'high'") and **row_7** invalid (missing NumberOfSections), with no prediction made for either. It offered to classify them after a fix. | 5 + 3 + 2 = 10 match the tool output. All 8 per-row classes and scores verified against the model: exact match. | **Pass** |
+| 6 | **Missing labels.** Uploaded `unlabeled_batch.csv`; "Evaluate the model's accuracy on unlabeled_batch.csv." | *none* | It said accuracy can't be evaluated because the file has no Label column, so there are no true labels. It reported no metrics and offered two options: batch-classify the file, or upload a labeled version. It saw `has_Label_column=False` in the session file list and asked for clarification instead of calling a tool. | No metrics reported (correct). | **Pass** |
+| 7 | **Single-class evaluation.** Uploaded `labeled_single_class_malware.csv`; "Evaluate labeled_single_class_malware.csv." | `evaluate_labeled_data(file_id="file_871ec342")` → ok, `auc: null` | **AUC undefined**, explained (only malware present). Accuracy 0.966667 (96.67%), confusion matrix TN 0, FP 0, FN 1, TP 29. It noted the results say nothing about goodware performance. | 29 / 30 = 0.966667. Matches the tool output. | **Pass** |
+| 8 | **Tool/service failure.** "Classify the pre-filled example malware record." with the controlled fault enabled (`simulate_tool_failure=true`). | `predict_single_record(example="example_malware")` → **error**: "simulated service failure …" | "The classification failed … I have no prediction, score, or threshold to report." It did not claim any class. The code-generated warning banner was also shown. | No result is presented for the failed step. | **Pass** |
 
 ## Failure patterns and findings
 
-_Summarise any failures or near-misses (e.g. rounding of percentages, extra tool calls, wording that implies calibrated confidence), what caused them, and any prompt or tool changes made in response._
+* **No failures** in this run. The agent never produced a classification without a tool call, never contradicted a tool output, and never described the uncalibrated score as a probability or a confidence level.
+* **Conditional logic held in both directions.** The decision followed the code-computed `meets_min_accuracy` value. The 98% case correctly skipped the prediction tool.
+* **Judgment on missing labels (scenario 6).** The agent asked for clarification without calling any tool, using the session file list. This is acceptable behaviour under the requirements: it did not compute or invent metrics. The evaluation tool's own missing-label error path is covered by the CI test `test_conditional_does_not_predict_when_evaluation_fails`.
+* **Minor transparency gap (activity record).** For `query_results` and batch previews, the activity record summarises the call (query, count) but does not list every row returned to the AI model, so per-row values in the reply (scenarios 4 and 5) are not visible in the activity record itself. I verified them independently: all match. A possible improvement is to include the returned row IDs in the activity summary.
+* **Minor UX point.** The batch replies give the download link as a relative path (`/api/results/…/download`). The UI separately renders a clickable "Download batch results (CSV)" link under the reply, so the user can still reach the file.
+* **Limitations of this evaluation.** It is a single run per scenario. AI-model wording can vary between runs, and the automatic checks are heuristics, which is why every reply was also reviewed by hand. The labeled demo file deliberately includes misclassified hold-out rows so that errors are visible. It is not a random sample, so its 94% accuracy is not an estimate of model performance; see `evaluation-and-design.md` for the hold-out results.
